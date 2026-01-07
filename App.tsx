@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   BarChart3, FileSpreadsheet, Download, Table, LayoutDashboard, 
@@ -46,7 +45,8 @@ const App: React.FC = () => {
 
   // Diagnóstico de API KEY
   useEffect(() => {
-    if (!process.env.API_KEY || process.env.API_KEY === "undefined") {
+    const key = process.env.API_KEY;
+    if (!key || key === "undefined" || key === "") {
       console.warn("AVISO: API_KEY não detectada.");
       setApiKeyMissing(true);
     } else {
@@ -149,7 +149,7 @@ const App: React.FC = () => {
         contents: `Analise estes dados de logística AOS GOL e resuma em português: ${dataString}`,
       });
 
-      setAiSummary(response.text);
+      setAiSummary(response.text ?? null);
     } catch (err) {
       setAiSummary("Erro na comunicação com a IA.");
     } finally {
@@ -168,7 +168,7 @@ const App: React.FC = () => {
         model: 'gemini-3-flash-preview',
         contents: userQuestion,
       });
-      setAiAnswer(response.text);
+      setAiAnswer(response.text ?? null);
     } catch (err) {
       setAiAnswer("Erro ao processar pergunta.");
     } finally {
@@ -229,7 +229,7 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-12 bg-slate-50">
       {apiKeyMissing && (
         <div className="bg-red-600 text-white px-6 py-2 flex items-center justify-center gap-2 text-xs font-bold animate-pulse">
-          <Key size={14} /> AVISO: A VARIÁVEL 'API_KEY' NÃO FOI CONFIGURADA NO NETLIFY. AS FUNÇÕES DE IA NÃO FUNCIONARÃO.
+          <Key size={14} /> AVISO: A VARIÁVEL 'API_KEY' NÃO FOI CONFIGURADA NO NETLIFY OU ESTÁ INVÁLIDA.
         </div>
       )}
 
