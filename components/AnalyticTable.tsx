@@ -89,7 +89,7 @@ const AnalyticTable: React.FC<AnalyticTableProps> = ({ data, fullData, isAdmin, 
         </div>
       </div>
 
-      <div className="w-full overflow-x-auto border-b border-slate-200 relative scrollbar-hide">
+      <div className="w-full overflow-auto border-b border-slate-200 relative max-h-[600px]">
         <table className="w-full border-collapse text-left table-fixed">
           <thead className="sticky top-0 z-10 bg-slate-50">
             <tr>
