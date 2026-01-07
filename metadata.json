@@ -1,0 +1,5 @@
+{
+  "name": "Dashboard AOS",
+  "description": "A high-performance aviation logistics dashboard for managing AOS (Aircraft on Ground) events, featuring Excel imports, interactive charts, and advanced data export capabilities.",
+  "requestFramePermissions": []
+}
