@@ -3,7 +3,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   BarChart3, FileSpreadsheet, Download, Table, LayoutDashboard, 
   FileCode, Lock, Unlock, LogOut, X, Cloud, AlertCircle, Sparkles, Trash2, Search, Filter, Send,
-  Settings2, Key
+  Settings2, Key, SlidersHorizontal
 } from 'lucide-react';
 import { AOSRow, ChartView } from './types';
 import StatCard from './components/StatCard';
@@ -28,9 +28,13 @@ const App: React.FC = () => {
   const [connError, setConnError] = useState<string | null>(null);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
   
-  // Controles manuais de eixo/barras
-  const [manualBarThickness, setManualBarThickness] = useState(20);
-  const [manualRowHeight, setManualRowHeight] = useState(20.3);
+  // Controles manuais de gráfico
+  const [manualBarThickness, setManualBarThickness] = useState(25);
+  const [manualRowHeight, setManualRowHeight] = useState(22);
+  const [manualChartWidth, setManualChartWidth] = useState(100);
+  const [manualBarPercentage, setManualBarPercentage] = useState(0.9);
+  const [manualCategoryPercentage, setManualCategoryPercentage] = useState(0.8);
+  const [showChartSettings, setShowChartSettings] = useState(false);
 
   // AI States
   const [aiSummary, setAiSummary] = useState<string | null>(null);
@@ -221,7 +225,8 @@ const App: React.FC = () => {
     if (chartView === 'acft' || chartView === 'partnumber') {
       const field = chartView === 'acft' ? 'ac' : 'partnumber';
       const uniqueCount = new Set(filteredData.map(r => r[field as keyof AOSRow])).size;
-      return Math.max(400, uniqueCount * manualRowHeight + 80);
+      const count = chartView === 'partnumber' ? Math.min(uniqueCount, 50) : uniqueCount;
+      return Math.max(400, count * manualRowHeight + 80);
     }
     return 400;
   }, [chartView, filteredData, manualRowHeight]);
@@ -320,20 +325,89 @@ const App: React.FC = () => {
               <StatCard label="Partnumbers" value={stats.partnumbers} color="purple" />
             </div>
 
-            <section className="bg-white rounded-2xl border p-6 shadow-sm">
-              <div className="flex justify-between items-center mb-6">
+            <section className="bg-white rounded-2xl border p-6 shadow-sm overflow-hidden">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <h3 className="text-xl font-bold text-slate-900">Gráfico de Performance</h3>
-                <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
-                  {(['base', 'acft', 'partnumber', 'tipo', 'tempo'] as ChartView[]).map(v => (
-                    <button key={v} onClick={() => setChartView(v)} className={`px-4 py-1.5 rounded-md text-xs font-bold ${chartView === v ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500'}`}>
-                      {v.toUpperCase()}
-                    </button>
-                  ))}
+                
+                <div className="flex flex-wrap items-center gap-3">
+                  <button 
+                    onClick={() => setShowChartSettings(!showChartSettings)}
+                    className={`p-2 rounded-lg transition-colors ${showChartSettings ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    title="Ajustes Manuais"
+                  >
+                    <SlidersHorizontal size={18} />
+                  </button>
+
+                  <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
+                    {(['base', 'tipo', 'tempo', 'partnumber', 'acft'] as ChartView[]).map(v => (
+                      <button key={v} onClick={() => setChartView(v)} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${chartView === v ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                        {v === 'partnumber' ? 'PART NUMBER' : v.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div className="h-[400px] overflow-auto">
-                <div style={{ height: chartHeight + 'px' }}>
-                  <MainChart data={filteredData} view={chartView} onBarClick={(l, r) => setSelectedBarData({ label: l, rows: r })} />
+
+              {showChartSettings && (
+                <div className="mb-6 p-4 bg-slate-50 border rounded-xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 animate-in slide-in-from-top duration-300">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Largura (%)</label>
+                    <input 
+                      type="range" min="50" max="100" step="1" 
+                      value={manualChartWidth} onChange={e => setManualChartWidth(Number(e.target.value))}
+                      className="w-full accent-orange-600"
+                    />
+                    <div className="text-[10px] text-right text-slate-400 font-mono">{manualChartWidth}%</div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Espessura Barras</label>
+                    <input 
+                      type="range" min="5" max="60" step="1" 
+                      value={manualBarThickness} onChange={e => setManualBarThickness(Number(e.target.value))}
+                      className="w-full accent-orange-600"
+                    />
+                    <div className="text-[10px] text-right text-slate-400 font-mono">{manualBarThickness}px</div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Altura Item (px)</label>
+                    <input 
+                      type="range" min="10" max="60" step="1" 
+                      value={manualRowHeight} onChange={e => setManualRowHeight(Number(e.target.value))}
+                      className="w-full accent-orange-600"
+                    />
+                    <div className="text-[10px] text-right text-slate-400 font-mono">{manualRowHeight}px</div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Aproximação 1 (Bar)</label>
+                    <input 
+                      type="range" min="0.1" max="1" step="0.05" 
+                      value={manualBarPercentage} onChange={e => setManualBarPercentage(Number(e.target.value))}
+                      className="w-full accent-orange-600"
+                    />
+                    <div className="text-[10px] text-right text-slate-400 font-mono">{manualBarPercentage}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Aproximação 2 (Cat)</label>
+                    <input 
+                      type="range" min="0.1" max="1" step="0.05" 
+                      value={manualCategoryPercentage} onChange={e => setManualCategoryPercentage(Number(e.target.value))}
+                      className="w-full accent-orange-600"
+                    />
+                    <div className="text-[10px] text-right text-slate-400 font-mono">{manualCategoryPercentage}</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="h-[400px] overflow-auto border rounded-xl bg-white scrollbar-hide">
+                <div style={{ height: chartHeight + 'px', width: manualChartWidth + '%', margin: '0 auto' }}>
+                  <MainChart 
+                    data={filteredData} 
+                    view={chartView} 
+                    onBarClick={(l, r) => setSelectedBarData({ label: l, rows: r })} 
+                    barThickness={manualBarThickness}
+                    barPercentage={manualBarPercentage}
+                    categoryPercentage={manualCategoryPercentage}
+                  />
                 </div>
               </div>
             </section>

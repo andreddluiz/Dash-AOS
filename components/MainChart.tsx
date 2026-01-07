@@ -29,9 +29,18 @@ interface MainChartProps {
   view: ChartView;
   onBarClick: (label: string, rows: AOSRow[]) => void;
   barThickness?: number;
+  barPercentage?: number;
+  categoryPercentage?: number;
 }
 
-const MainChart: React.FC<MainChartProps> = ({ data, view, onBarClick, barThickness = 20 }) => {
+const MainChart: React.FC<MainChartProps> = ({ 
+  data, 
+  view, 
+  onBarClick, 
+  barThickness = 25,
+  barPercentage = 0.9,
+  categoryPercentage = 0.8
+}) => {
   // Aeronaves e Partnumbers usam layout horizontal devido à quantidade de itens
   const isHorizontal = view === 'acft' || view === 'partnumber';
 
@@ -75,8 +84,8 @@ const MainChart: React.FC<MainChartProps> = ({ data, view, onBarClick, barThickn
               ? { topRight: 8, bottomRight: 8 } 
               : { topLeft: 8, topRight: 8 },
             barThickness: barThickness,
-            barPercentage: 1.0,
-            categoryPercentage: 1.0,
+            barPercentage: barPercentage,
+            categoryPercentage: categoryPercentage,
             minBarLength: 2,
           },
         ],
@@ -84,7 +93,7 @@ const MainChart: React.FC<MainChartProps> = ({ data, view, onBarClick, barThickn
       },
       maxValue: max
     };
-  }, [data, view, isHorizontal, barThickness]);
+  }, [data, view, isHorizontal, barThickness, barPercentage, categoryPercentage]);
 
   const options = {
     indexAxis: isHorizontal ? 'y' as const : 'x' as const,
