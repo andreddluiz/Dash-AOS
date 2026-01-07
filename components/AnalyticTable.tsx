@@ -75,21 +75,21 @@ const AnalyticTable: React.FC<AnalyticTableProps> = ({ data, fullData, isAdmin, 
             <input type="text" placeholder="Busca global..." className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => exportToExcel(filteredData, 'visao_filtrada.xlsx')} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200">Exportar Filtrado</button>
-            <button onClick={() => exportToPdf(fullData, 'Dados Completos')} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm">Exportar PDF Full</button>
+            <button onClick={() => exportToExcel(filteredData, 'visao_filtrada.xlsx')} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors">Exportar Filtrado</button>
+            <button onClick={() => exportToPdf(fullData, 'Dados Completos')} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm transition-colors">Exportar PDF Full</button>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
           <Filter size={14} className="text-slate-400" />
-          <select className="text-xs border rounded-lg px-2 py-1.5 bg-white" value={filterColumn} onChange={e => setFilterColumn(e.target.value as keyof AOSRow)}>
+          <select className="text-xs border rounded-lg px-2 py-1.5 bg-white font-medium" value={filterColumn} onChange={e => setFilterColumn(e.target.value as keyof AOSRow)}>
             <option value="">Filtrar por Coluna</option>
             {ANALYTIC_COLUMNS.map(col => <option key={col} value={col}>{COLUMN_DISPLAY_NAMES[col]}</option>)}
           </select>
-          <input type="text" placeholder="Valor..." className="text-xs border rounded-lg px-3 py-1.5 bg-white flex-1 max-w-xs" value={filterValue} onChange={e => setFilterValue(e.target.value)} />
+          <input type="text" placeholder="Valor..." className="text-xs border rounded-lg px-3 py-1.5 bg-white flex-1 max-w-xs outline-none focus:ring-2 focus:ring-blue-100" value={filterValue} onChange={e => setFilterValue(e.target.value)} />
         </div>
       </div>
 
-      <div className="w-full overflow-x-auto border-b border-slate-200 relative">
+      <div className="w-full overflow-x-auto border-b border-slate-200 relative scrollbar-hide">
         <table className="w-full border-collapse text-left table-fixed">
           <thead className="sticky top-0 z-10 bg-slate-50">
             <tr>
@@ -97,17 +97,17 @@ const AnalyticTable: React.FC<AnalyticTableProps> = ({ data, fullData, isAdmin, 
               {columnOrder.map((col, idx) => (
                 <th key={col} className="px-4 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 select-none relative group/header" style={{ width: columnWidths[col] || 150 }}>
                   <div className="flex items-center gap-2">
-                    <span className="truncate flex-1 cursor-pointer" onClick={() => setSort({ col, dir: sort.col === col ? (sort.dir * -1 as 1 | -1) : 1 })}>{COLUMN_DISPLAY_NAMES[col]}</span>
+                    <span className="truncate flex-1 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => setSort({ col, dir: sort.col === col ? (sort.dir * -1 as 1 | -1) : 1 })}>{COLUMN_DISPLAY_NAMES[col]}</span>
                     <ArrowUpDown size={10} className={sort.col === col ? 'text-blue-500' : 'text-slate-300'} />
                   </div>
-                  <div onMouseDown={(e) => handleResizeStart(e, col)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 z-20" />
+                  <div onMouseDown={(e) => handleResizeStart(e, col)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize group-hover/header:bg-blue-300 z-20" />
                 </th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 bg-white">
             {pagedData.map((row, idx) => (
-              <tr key={row.id || idx} className="hover:bg-blue-50/20 group">
+              <tr key={row.id || idx} className="hover:bg-blue-50/20 group transition-colors">
                 {isAdmin && (
                   <td className="px-4 py-3 text-center">
                     <button onClick={() => row.id && onDelete?.(row.id)} className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
@@ -128,7 +128,7 @@ const AnalyticTable: React.FC<AnalyticTableProps> = ({ data, fullData, isAdmin, 
         <div className="flex items-center gap-3 text-sm text-slate-500 font-medium">
           Exibir 
           <select 
-            className="border rounded-lg px-2 py-1 outline-none bg-white font-bold text-slate-700" 
+            className="border rounded-lg px-2 py-1 outline-none bg-white font-bold text-slate-700 hover:border-slate-300 transition-all cursor-pointer" 
             value={rowsPerPage} 
             onChange={e => {
               const val = e.target.value === 'all' ? 'all' : Number(e.target.value);
@@ -137,15 +137,15 @@ const AnalyticTable: React.FC<AnalyticTableProps> = ({ data, fullData, isAdmin, 
             }}
           >
             {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-            <option value="all">Todos</option>
+            <option value="all">Exibir Todos</option>
           </select> 
           linhas
         </div>
         {rowsPerPage !== 'all' && (
           <div className="flex items-center gap-2">
-            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-2 border rounded-lg bg-white disabled:opacity-30 hover:bg-slate-50 transition-colors"><ChevronLeft size={18} /></button>
-            <span className="text-sm font-bold px-4">{page} / {totalPages || 1}</span>
-            <button disabled={page === totalPages || totalPages === 0} onClick={() => setPage(p => p + 1)} className="p-2 border rounded-lg bg-white disabled:opacity-30 hover:bg-slate-50 transition-colors"><ChevronRight size={18} /></button>
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-2 border rounded-lg bg-white disabled:opacity-30 hover:bg-slate-50 transition-all shadow-sm"><ChevronLeft size={18} /></button>
+            <span className="text-sm font-bold px-4 text-slate-700">{page} / {totalPages || 1}</span>
+            <button disabled={page === totalPages || totalPages === 0} onClick={() => setPage(p => p + 1)} className="p-2 border rounded-lg bg-white disabled:opacity-30 hover:bg-slate-50 transition-all shadow-sm"><ChevronRight size={18} /></button>
           </div>
         )}
       </div>

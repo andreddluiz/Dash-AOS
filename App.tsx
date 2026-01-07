@@ -52,10 +52,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const key = process.env.API_KEY;
     if (!key || key === "undefined" || key === "") {
-      console.warn("AVISO: API_KEY não detectada.");
       setApiKeyMissing(true);
     } else {
-      console.log("INFO: API_KEY detectada.");
       setApiKeyMissing(false);
     }
   }, []);
@@ -140,9 +138,10 @@ const App: React.FC = () => {
 
   const generateAiSummary = async () => {
     if (!process.env.API_KEY) {
-      alert("Erro: API_KEY ausente.");
+      alert("A chave de API não foi configurada no ambiente de produção (Netlify). O analista de IA está desativado.");
       return;
     }
+    
     setIsGeneratingAi(true);
     setAiSummary(null);
     setAiAnswer(null);
@@ -150,31 +149,46 @@ const App: React.FC = () => {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
-      // Criar um contexto agregado para a IA em vez de apenas linhas brutas
+      // Cálculo de estatísticas ricas para o prompt
       const baseStats: Record<string, number> = {};
       const typeStats: Record<string, number> = {};
+      const pnStats: Record<string, number> = {};
+      const rangeStats: Record<string, number> = {};
+      
       filteredData.forEach(r => {
         baseStats[r.base] = (baseStats[r.base] || 0) + 1;
         typeStats[r.analise_mtl] = (typeStats[r.analise_mtl] || 0) + 1;
+        pnStats[r.partnumber] = (pnStats[r.partnumber] || 0) + 1;
+        rangeStats[r.range] = (rangeStats[r.range] || 0) + 1;
       });
 
-      const context = `
-        Resumo Operacional AOS GOL:
-        Total de Eventos: ${filteredData.length}
-        Bases mais afetadas: ${Object.entries(baseStats).sort((a,b) => b[1]-a[1]).slice(0,5).map(([k,v]) => `${k}(${v})`).join(', ')}
-        Tipos de Atendimento: ${Object.entries(typeStats).map(([k,v]) => `${k}: ${v}`).join(' | ')}
-        Período selecionado: ${currentMonth === 'all' ? 'Geral' : currentMonth}
+      const topBases = Object.entries(baseStats).sort((a,b) => b[1]-a[1]).slice(0, 3).map(([k,v]) => `${k}: ${v}`).join(', ');
+      const topPNs = Object.entries(pnStats).sort((a,b) => b[1]-a[1]).slice(0, 5).map(([k,v]) => `${k} (${v}x)`).join(', ');
+      const mtlPercent = ((filteredData.filter(r => (r.mtl_utilizado || '').toUpperCase() === 'SIM').length / filteredData.length) * 100).toFixed(1);
+
+      const contextData = `
+        SNAPSHOT OPERACIONAL GOL:
+        - Total de Eventos AOS: ${filteredData.length}
+        - Top 3 Bases: ${topBases}
+        - Principais Part Numbers: ${topPNs}
+        - Utilização de MTL: ${mtlPercent}% dos casos
+        - Distribuição de Tempo (Range): ${JSON.stringify(rangeStats)}
+        - Período: ${currentMonth === 'all' ? 'Dados Acumulados' : currentMonth}
       `;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `Você é um analista sênior de logística de aviação da GOL. Analise o seguinte contexto e forneça insights estratégicos em português, focando em gargalos e performance: ${context}`,
+        contents: `Analise este snapshot de logística AOS e forneça um resumo executivo focado em eficiência e gargalos: ${contextData}`,
+        config: {
+          systemInstruction: "Você é o Analista de Logística Sênior da GOL Linhas Aéreas. Sua missão é analisar dados de AOS (Aircraft On Ground) e identificar padrões, problemas críticos e sugerir melhorias. Seja direto, profissional e focado em resultados operacionais.",
+          temperature: 0.7
+        }
       });
 
-      setAiSummary(response.text ?? "Não foi possível gerar o resumo.");
-    } catch (err) {
-      setAiSummary("Erro na comunicação com a IA. Verifique os logs do console.");
-      console.error(err);
+      setAiSummary(response.text || "Falha ao extrair texto da IA.");
+    } catch (err: any) {
+      console.error("Erro AI Summary:", err);
+      setAiSummary(`Erro técnico: ${err.message || 'Erro desconhecido'}`);
     } finally {
       setIsGeneratingAi(false);
     }
@@ -182,7 +196,13 @@ const App: React.FC = () => {
 
   const askAiQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userQuestion.trim() || !process.env.API_KEY) return;
+    const question = userQuestion.trim();
+    
+    if (!question) return;
+    if (!process.env.API_KEY) {
+      alert("Chave de API ausente no servidor.");
+      return;
+    }
     
     setIsAnswering(true);
     setAiAnswer(null);
@@ -190,20 +210,24 @@ const App: React.FC = () => {
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const currentQ = userQuestion;
       setUserQuestion('');
 
-      const dataSample = filteredData.slice(0, 50).map(r => `Base:${r.base},AC:${r.ac},PN:${r.partnumber},T_AOS:${r.tempo_aos}`).join(';');
+      // Enviar uma amostra representativa de dados junto com a pergunta
+      const sample = filteredData.slice(0, 80).map(r => `Base:${r.base}|PN:${r.partnumber}|Tempo:${r.tempo_aos}|MTL:${r.analise_mtl}`).join('; ');
       
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `Contexto de Amostra (Top 50 registros): ${dataSample}\n\nPergunta do Usuário: ${currentQ}`,
+        contents: `Amostra de dados atuais: ${sample}\n\nPergunta do usuário: ${question}`,
+        config: {
+          systemInstruction: "Responda dúvidas sobre a operação AOS da GOL. Use os dados fornecidos como base. Se a informação não estiver nos dados, informe que não tem visibilidade completa sobre esse ponto específico.",
+          thinkingConfig: { thinkingBudget: 2000 }
+        }
       });
 
-      setAiAnswer(response.text ?? "A IA não retornou uma resposta válida.");
-    } catch (err) {
-      setAiAnswer("Erro ao processar sua pergunta. Tente novamente em instantes.");
-      console.error(err);
+      setAiAnswer(response.text || "Sem resposta da IA.");
+    } catch (err: any) {
+      console.error("Erro AI Question:", err);
+      setAiAnswer(`Erro ao processar pergunta: ${err.message}`);
     } finally {
       setIsAnswering(false);
     }
@@ -258,7 +282,7 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-12 bg-slate-50">
       {apiKeyMissing && (
         <div className="bg-red-600 text-white px-6 py-2 flex items-center justify-center gap-2 text-xs font-bold animate-pulse">
-          <Key size={14} /> AVISO: A VARIÁVEL 'API_KEY' NÃO FOI CONFIGURADA NO NETLIFY OU ESTÁ INVÁLIDA.
+          <Key size={14} /> AVISO: A CHAVE DE API DO GOOGLE NÃO FOI CONFIGURADA NO NETLIFY. RECURSOS DE IA INDISPONÍVEIS.
         </div>
       )}
 
@@ -317,13 +341,13 @@ const App: React.FC = () => {
               </div>
               <div className="space-y-4">
                 <form onSubmit={askAiQuestion} className="relative">
-                  <input type="text" value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)} placeholder="Faça uma pergunta para a IA..." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-12 text-white placeholder:text-white/50 outline-none focus:bg-white/20" />
-                  <button type="submit" disabled={isAnswering} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/70 hover:text-white disabled:opacity-30">
+                  <input type="text" value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)} placeholder="Faça uma pergunta sobre a operação..." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-12 text-white placeholder:text-white/50 outline-none focus:bg-white/20" />
+                  <button type="submit" disabled={isAnswering || !userQuestion.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/70 hover:text-white disabled:opacity-30">
                     {isAnswering ? <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <Send size={20} />}
                   </button>
                 </form>
                 {(aiSummary || aiAnswer) && (
-                  <div className="bg-white/10 rounded-xl p-4 border border-white/20 text-sm leading-relaxed whitespace-pre-wrap animate-in fade-in duration-300">
+                  <div className="bg-white/10 rounded-xl p-4 border border-white/20 text-sm leading-relaxed whitespace-pre-wrap animate-in fade-in duration-500">
                     {aiSummary || aiAnswer}
                   </div>
                 )}
