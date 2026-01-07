@@ -20,6 +20,8 @@ export const ANALYTIC_COLUMNS: (keyof AOSRow)[] = [
 ];
 
 export const COLUMN_DISPLAY_NAMES: Record<keyof AOSRow, string> = {
+  // Added id property to satisfy the Record<keyof AOSRow, string> type requirement
+  id: "ID",
   start_date: "DATA",
   ac: "ACFT",
   tempo_aos: "TEMPO AOS",

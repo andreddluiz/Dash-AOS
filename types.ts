@@ -1,5 +1,6 @@
 
 export interface AOSRow {
+  id?: number; // Adicionado para referência no Supabase
   start_date: string;
   ac: string;
   tempo_aos: string;
@@ -17,7 +18,7 @@ export interface AOSRow {
   mtl_utilizado: string;
 }
 
-export type ChartView = 'base' | 'tipo' | 'tempo';
+export type ChartView = 'base' | 'tipo' | 'tempo' | 'distribuicao' | 'acft' | 'partnumber';
 
 export interface SortState {
   col: keyof AOSRow;
