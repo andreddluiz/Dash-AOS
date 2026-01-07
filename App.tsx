@@ -43,6 +43,15 @@ const App: React.FC = () => {
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
 
+  // Diagnóstico de API KEY
+  useEffect(() => {
+    if (!process.env.API_KEY) {
+      console.warn("AVISO: API_KEY não detectada. Verifique as variáveis de ambiente no Netlify.");
+    } else {
+      console.log("INFO: API_KEY configurada corretamente.");
+    }
+  }, []);
+
   const fetchSupabaseData = async () => {
     setIsLoadingData(true);
     setConnError(null);
@@ -122,6 +131,10 @@ const App: React.FC = () => {
   };
 
   const generateAiSummary = async () => {
+    if (!process.env.API_KEY) {
+      alert("Erro: Chave de API da IA não configurada no Netlify.");
+      return;
+    }
     setIsGeneratingAi(true);
     setAiSummary(null);
     try {
@@ -147,6 +160,10 @@ const App: React.FC = () => {
   const askAiQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userQuestion.trim()) return;
+    if (!process.env.API_KEY) {
+      alert("Erro: Chave de API da IA não configurada.");
+      return;
+    }
     setIsAnswering(true);
     setAiAnswer(null);
     try {
