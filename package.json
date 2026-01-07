@@ -1,30 +1,32 @@
+
 {
-  "name": "dashboard-aos",
+  "name": "dashboard-aos-gol",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-dom": "^19.2.3",
-    "react": "^19.2.3",
-    "jspdf": "^4.0.0",
-    "jspdf-autotable": "^5.0.7",
-    "lucide-react": "^0.562.0",
-    "react-chartjs-2": "^5.3.1",
-    "xlsx": "^0.18.5",
-    "chart.js": "^4.5.1",
+    "@google/genai": "^1.34.0",
+    "@supabase/supabase-js": "^2.48.0",
+    "chart.js": "^4.4.1",
     "chartjs-plugin-datalabels": "^2.2.0",
-    "@supabase/supabase-js": "2.48.0",
-    "@google/genai": "^1.34.0"
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
+    "lucide-react": "^0.562.0",
+    "react": "^19.0.0",
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^19.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
   }
 }
