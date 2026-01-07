@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   BarChart3, FileSpreadsheet, Download, Table, LayoutDashboard, 
-  FileCode, Lock, Unlock, LogOut, X, Cloud, AlertCircle, Sparkles, Trash2, Search, Filter, Send,
+  FileCode, Lock, Unlock, LogOut, X, Cloud, AlertCircle, Trash2, Search, Filter,
   Settings2, Key, SlidersHorizontal
 } from 'lucide-react';
 import { AOSRow, ChartView } from './types';
@@ -11,7 +11,6 @@ import MainChart from './components/MainChart';
 import AnalyticTable from './components/AnalyticTable';
 import { processExcelFile } from './services/excelService';
 import { supabase } from './services/supabaseClient';
-import { GoogleGenAI } from "@google/genai";
 
 const AUTH_STORAGE_KEY = 'dashboard_aos_auth';
 const SESSION_DURATION = 24 * 60 * 60 * 1000;
@@ -26,7 +25,6 @@ const App: React.FC = () => {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [selectedBarData, setSelectedBarData] = useState<{ label: string; rows: AOSRow[] } | null>(null);
   const [connError, setConnError] = useState<string | null>(null);
-  const [apiKeyMissing, setApiKeyMissing] = useState(false);
   
   // Controles manuais de gráfico
   const [manualBarThickness, setManualBarThickness] = useState(25);
@@ -36,27 +34,10 @@ const App: React.FC = () => {
   const [manualCategoryPercentage, setManualCategoryPercentage] = useState(0.8);
   const [showChartSettings, setShowChartSettings] = useState(false);
 
-  // AI States
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
-  const [userQuestion, setUserQuestion] = useState('');
-  const [aiAnswer, setAiAnswer] = useState<string | null>(null);
-  const [isAnswering, setIsAnswering] = useState(false);
-
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
-
-  // Diagnóstico de API KEY
-  useEffect(() => {
-    const key = process.env.API_KEY;
-    if (!key || key === "undefined" || key === "") {
-      setApiKeyMissing(true);
-    } else {
-      setApiKeyMissing(false);
-    }
-  }, []);
 
   const fetchSupabaseData = async () => {
     setIsLoadingData(true);
@@ -136,103 +117,6 @@ const App: React.FC = () => {
     else await fetchSupabaseData();
   };
 
-  const generateAiSummary = async () => {
-    if (!process.env.API_KEY) {
-      alert("A chave de API não foi configurada no ambiente de produção (Netlify). O analista de IA está desativado.");
-      return;
-    }
-    
-    setIsGeneratingAi(true);
-    setAiSummary(null);
-    setAiAnswer(null);
-
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      // Cálculo de estatísticas ricas para o prompt
-      const baseStats: Record<string, number> = {};
-      const typeStats: Record<string, number> = {};
-      const pnStats: Record<string, number> = {};
-      const rangeStats: Record<string, number> = {};
-      
-      filteredData.forEach(r => {
-        baseStats[r.base] = (baseStats[r.base] || 0) + 1;
-        typeStats[r.analise_mtl] = (typeStats[r.analise_mtl] || 0) + 1;
-        pnStats[r.partnumber] = (pnStats[r.partnumber] || 0) + 1;
-        rangeStats[r.range] = (rangeStats[r.range] || 0) + 1;
-      });
-
-      const topBases = Object.entries(baseStats).sort((a,b) => b[1]-a[1]).slice(0, 3).map(([k,v]) => `${k}: ${v}`).join(', ');
-      const topPNs = Object.entries(pnStats).sort((a,b) => b[1]-a[1]).slice(0, 5).map(([k,v]) => `${k} (${v}x)`).join(', ');
-      const mtlPercent = ((filteredData.filter(r => (r.mtl_utilizado || '').toUpperCase() === 'SIM').length / filteredData.length) * 100).toFixed(1);
-
-      const contextData = `
-        SNAPSHOT OPERACIONAL GOL:
-        - Total de Eventos AOS: ${filteredData.length}
-        - Top 3 Bases: ${topBases}
-        - Principais Part Numbers: ${topPNs}
-        - Utilização de MTL: ${mtlPercent}% dos casos
-        - Distribuição de Tempo (Range): ${JSON.stringify(rangeStats)}
-        - Período: ${currentMonth === 'all' ? 'Dados Acumulados' : currentMonth}
-      `;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Analise este snapshot de logística AOS e forneça um resumo executivo focado em eficiência e gargalos: ${contextData}`,
-        config: {
-          systemInstruction: "Você é o Analista de Logística Sênior da GOL Linhas Aéreas. Sua missão é analisar dados de AOS (Aircraft On Ground) e identificar padrões, problemas críticos e sugerir melhorias. Seja direto, profissional e focado em resultados operacionais.",
-          temperature: 0.7
-        }
-      });
-
-      setAiSummary(response.text || "Falha ao extrair texto da IA.");
-    } catch (err: any) {
-      console.error("Erro AI Summary:", err);
-      setAiSummary(`Erro técnico: ${err.message || 'Erro desconhecido'}`);
-    } finally {
-      setIsGeneratingAi(false);
-    }
-  };
-
-  const askAiQuestion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const question = userQuestion.trim();
-    
-    if (!question) return;
-    if (!process.env.API_KEY) {
-      alert("Chave de API ausente no servidor.");
-      return;
-    }
-    
-    setIsAnswering(true);
-    setAiAnswer(null);
-    setAiSummary(null);
-
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      setUserQuestion('');
-
-      // Enviar uma amostra representativa de dados junto com a pergunta
-      const sample = filteredData.slice(0, 80).map(r => `Base:${r.base}|PN:${r.partnumber}|Tempo:${r.tempo_aos}|MTL:${r.analise_mtl}`).join('; ');
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Amostra de dados atuais: ${sample}\n\nPergunta do usuário: ${question}`,
-        config: {
-          systemInstruction: "Responda dúvidas sobre a operação AOS da GOL. Use os dados fornecidos como base. Se a informação não estiver nos dados, informe que não tem visibilidade completa sobre esse ponto específico.",
-          thinkingConfig: { thinkingBudget: 2000 }
-        }
-      });
-
-      setAiAnswer(response.text || "Sem resposta da IA.");
-    } catch (err: any) {
-      console.error("Erro AI Question:", err);
-      setAiAnswer(`Erro ao processar pergunta: ${err.message}`);
-    } finally {
-      setIsAnswering(false);
-    }
-  };
-
   const filteredData = useMemo(() => {
     let data = rawData;
     if (currentMonth !== 'all') {
@@ -280,12 +164,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-12 bg-slate-50">
-      {apiKeyMissing && (
-        <div className="bg-red-600 text-white px-6 py-2 flex items-center justify-center gap-2 text-xs font-bold animate-pulse">
-          <Key size={14} /> AVISO: A CHAVE DE API DO GOOGLE NÃO FOI CONFIGURADA NO NETLIFY. RECURSOS DE IA INDISPONÍVEIS.
-        </div>
-      )}
-
       {showLoginModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
@@ -329,31 +207,6 @@ const App: React.FC = () => {
           </div>
         ) : (
           <>
-            <section className="bg-gradient-to-br from-orange-500 to-slate-800 rounded-2xl p-6 shadow-xl text-white">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h2 className="text-xl font-bold flex items-center gap-2"><Sparkles /> Analista de IA GOL</h2>
-                  <p className="text-orange-100 text-sm">Insights automáticos baseados nos registros.</p>
-                </div>
-                <button onClick={generateAiSummary} disabled={isGeneratingAi || filteredData.length === 0} className="bg-white text-slate-900 px-6 py-2 rounded-xl font-bold text-sm shadow-lg hover:bg-orange-50 disabled:opacity-50 transition-all">
-                  {isGeneratingAi ? 'Analisando...' : 'Gerar Resumo'}
-                </button>
-              </div>
-              <div className="space-y-4">
-                <form onSubmit={askAiQuestion} className="relative">
-                  <input type="text" value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)} placeholder="Faça uma pergunta sobre a operação..." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-12 text-white placeholder:text-white/50 outline-none focus:bg-white/20" />
-                  <button type="submit" disabled={isAnswering || !userQuestion.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/70 hover:text-white disabled:opacity-30">
-                    {isAnswering ? <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <Send size={20} />}
-                  </button>
-                </form>
-                {(aiSummary || aiAnswer) && (
-                  <div className="bg-white/10 rounded-xl p-4 border border-white/20 text-sm leading-relaxed whitespace-pre-wrap animate-in fade-in duration-500">
-                    {aiSummary || aiAnswer}
-                  </div>
-                )}
-              </div>
-            </section>
-
             {isAuthenticated && (
               <section className="bg-white rounded-2xl border-2 border-orange-600 border-dashed p-6 flex justify-between items-center">
                 <div>
