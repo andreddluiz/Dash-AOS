@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   BarChart3, FileSpreadsheet, Download, Table, LayoutDashboard, 
@@ -252,8 +253,7 @@ const App: React.FC = () => {
       <header className="bg-white border-b sticky top-0 z-30 px-6 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-4">
-            <img src="https://logodownload.org/wp-content/uploads/2014/06/gol-logo-1.png" alt="GOL" className="h-8 object-contain" />
-            <h1 className="text-2xl font-bold text-slate-900 border-l pl-4 border-slate-200">DASHBOARD AOS</h1>
+            <h1 className="text-2xl font-bold text-slate-900">DASHBOARD AOS</h1>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setCurrentMonth('all')} className={`px-4 py-1.5 rounded-lg text-sm font-bold ${currentMonth === 'all' ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-600'}`}>GERAL</button>
@@ -324,7 +324,7 @@ const App: React.FC = () => {
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-slate-900">Gráfico de Performance</h3>
                 <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
-                  {(['base', 'acft', 'tipo', 'tempo'] as ChartView[]).map(v => (
+                  {(['base', 'acft', 'partnumber', 'tipo', 'tempo'] as ChartView[]).map(v => (
                     <button key={v} onClick={() => setChartView(v)} className={`px-4 py-1.5 rounded-md text-xs font-bold ${chartView === v ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500'}`}>
                       {v.toUpperCase()}
                     </button>
