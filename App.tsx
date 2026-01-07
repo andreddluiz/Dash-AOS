@@ -3,7 +3,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   BarChart3, FileSpreadsheet, Download, Table, LayoutDashboard, 
   FileCode, Lock, Unlock, LogOut, X, Cloud, AlertCircle, Sparkles, Trash2, Search, Filter, Send,
-  Settings2
+  Settings2, Key
 } from 'lucide-react';
 import { AOSRow, ChartView } from './types';
 import StatCard from './components/StatCard';
@@ -26,6 +26,7 @@ const App: React.FC = () => {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [selectedBarData, setSelectedBarData] = useState<{ label: string; rows: AOSRow[] } | null>(null);
   const [connError, setConnError] = useState<string | null>(null);
+  const [apiKeyMissing, setApiKeyMissing] = useState(false);
   
   // Controles manuais de eixo/barras
   const [manualBarThickness, setManualBarThickness] = useState(20);
@@ -45,10 +46,12 @@ const App: React.FC = () => {
 
   // Diagnóstico de API KEY
   useEffect(() => {
-    if (!process.env.API_KEY) {
-      console.warn("AVISO: API_KEY não detectada. Verifique as variáveis de ambiente no Netlify.");
+    if (!process.env.API_KEY || process.env.API_KEY === "undefined") {
+      console.warn("AVISO: API_KEY não detectada.");
+      setApiKeyMissing(true);
     } else {
-      console.log("INFO: API_KEY configurada corretamente.");
+      console.log("INFO: API_KEY detectada.");
+      setApiKeyMissing(false);
     }
   }, []);
 
@@ -62,7 +65,7 @@ const App: React.FC = () => {
         .order('id', { ascending: false });
 
       if (error) {
-        setConnError("Não foi possível conectar ao banco. Verifique as chaves no arquivo supabaseClient.ts");
+        setConnError("Erro ao carregar dados do Supabase.");
       } else {
         setRawData(data || []);
       }
@@ -132,26 +135,23 @@ const App: React.FC = () => {
 
   const generateAiSummary = async () => {
     if (!process.env.API_KEY) {
-      alert("Erro: Chave de API da IA não configurada no Netlify.");
+      alert("Erro: API_KEY ausente.");
       return;
     }
     setIsGeneratingAi(true);
     setAiSummary(null);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const dataString = filteredData.map(r => `Base:${r.base}|AC:${r.ac}|Tempo:${r.tempo_aos}|MTL:${r.mtl_utilizado}`).join('\n');
+      const dataString = filteredData.slice(0, 30).map(r => `Base:${r.base}|AC:${r.ac}|Tempo:${r.tempo_aos}`).join('\n');
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Analise o seguinte conjunto completo de dados de logística de aviação (AOS) e forneça um resumo executivo profissional:
-        Dados:
-        ${dataString}`,
-        config: { systemInstruction: "Você é um Analista de Logística Sênior da GOL Linhas Aéreas. Fale sobre desempenho de bases, eficiência de MTL e tendências baseando-se em TODOS os dados fornecidos." }
+        contents: `Analise estes dados de logística AOS GOL e resuma em português: ${dataString}`,
       });
 
       setAiSummary(response.text);
     } catch (err) {
-      setAiSummary("Erro ao gerar resumo com IA. O conjunto de dados pode ser muito grande para uma única requisição.");
+      setAiSummary("Erro na comunicação com a IA.");
     } finally {
       setIsGeneratingAi(false);
     }
@@ -159,26 +159,18 @@ const App: React.FC = () => {
 
   const askAiQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userQuestion.trim()) return;
-    if (!process.env.API_KEY) {
-      alert("Erro: Chave de API da IA não configurada.");
-      return;
-    }
+    if (!userQuestion.trim() || !process.env.API_KEY) return;
     setIsAnswering(true);
     setAiAnswer(null);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const dataString = filteredData.map(r => `Base:${r.base}|AC:${r.ac}|Tempo:${r.tempo_aos}|MTL:${r.mtl_utilizado}|Range:${r.range}`).join('\n');
-
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Pergunta do Usuário: ${userQuestion}\n\nBase de Dados Completa:\n${dataString}`,
-        config: { systemInstruction: "Você é um especialista em análise de dados de aviação da GOL. Responda à pergunta do usuário de forma concisa e técnica usando exclusivamente os dados fornecidos." }
+        contents: userQuestion,
       });
-
       setAiAnswer(response.text);
     } catch (err) {
-      setAiAnswer("Não foi possível processar sua pergunta agora.");
+      setAiAnswer("Erro ao processar pergunta.");
     } finally {
       setIsAnswering(false);
     }
@@ -214,13 +206,7 @@ const App: React.FC = () => {
         months.set(key, label);
       }
     });
-    return Array.from(months.entries())
-      .map(([key, label]) => ({ key, label }))
-      .sort((a, b) => {
-        const [mA, yA] = a.key.split('/').map(Number);
-        const [mB, yB] = b.key.split('/').map(Number);
-        return (yA * 100 + mA) - (yB * 100 + mB);
-      });
+    return Array.from(months.entries()).map(([key, label]) => ({ key, label }));
   }, [rawData]);
 
   const stats = useMemo(() => ({
@@ -240,18 +226,24 @@ const App: React.FC = () => {
   }, [chartView, filteredData, manualRowHeight]);
 
   return (
-    <div className="min-h-screen pb-12 transition-colors duration-500">
+    <div className="min-h-screen pb-12 bg-slate-50">
+      {apiKeyMissing && (
+        <div className="bg-red-600 text-white px-6 py-2 flex items-center justify-center gap-2 text-xs font-bold animate-pulse">
+          <Key size={14} /> AVISO: A VARIÁVEL 'API_KEY' NÃO FOI CONFIGURADA NO NETLIFY. AS FUNÇÕES DE IA NÃO FUNCIONARÃO.
+        </div>
+      )}
+
       {showLoginModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2"><Lock className="text-orange-600" />Admin Access</h2>
               <button onClick={() => setShowLoginModal(false)}><X size={24} /></button>
             </div>
             <form onSubmit={handleLogin} className="space-y-4">
-              <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-orange-100" placeholder="Senha..." autoFocus />
+              <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="w-full px-4 py-3 border rounded-xl" placeholder="Senha..." autoFocus />
               {loginError && <p className="text-red-500 text-sm">{loginError}</p>}
-              <button type="submit" className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-700 transition-colors">Entrar</button>
+              <button type="submit" className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold">Entrar</button>
             </form>
           </div>
         </div>
@@ -260,206 +252,100 @@ const App: React.FC = () => {
       <header className="bg-white border-b sticky top-0 z-30 px-6 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-4">
-            <img 
-              src="https://logodownload.org/wp-content/uploads/2014/06/gol-logo-1.png" 
-              alt="GOL" 
-              className="h-8 md:h-10 object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/GOL_Linhas_A%C3%A9reas_Logo.svg/1024px-GOL_Linhas_A%C3%A9reas_Logo.svg.png';
-              }}
-            />
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2 border-l pl-4 border-slate-200 uppercase tracking-tight">DASHBOARD AOS</h1>
-            <div className="hidden sm:flex items-center gap-2 bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter border border-orange-100">
-              <Cloud size={10} /> Sincronizado
-            </div>
+            <img src="https://logodownload.org/wp-content/uploads/2014/06/gol-logo-1.png" alt="GOL" className="h-8 object-contain" />
+            <h1 className="text-2xl font-bold text-slate-900 border-l pl-4 border-slate-200">DASHBOARD AOS</h1>
           </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <div className="flex bg-slate-100 p-1 rounded-lg">
-              <button 
-                onClick={() => setCurrentMonth('all')} 
-                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${currentMonth === 'all' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
-              >
-                GERAL
-              </button>
-              {monthTabs.map(tab => (
-                <button 
-                  key={tab.key} 
-                  onClick={() => setCurrentMonth(tab.key)} 
-                  className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${currentMonth === tab.key ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            
+          <div className="flex gap-2">
+            <button onClick={() => setCurrentMonth('all')} className={`px-4 py-1.5 rounded-lg text-sm font-bold ${currentMonth === 'all' ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-600'}`}>GERAL</button>
+            {monthTabs.map(tab => (
+              <button key={tab.key} onClick={() => setCurrentMonth(tab.key)} className={`px-4 py-1.5 rounded-lg text-sm font-bold ${currentMonth === tab.key ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{tab.label}</button>
+            ))}
             {isAuthenticated ? (
-              <button onClick={handleLogout} className="flex items-center gap-2 bg-red-50 text-red-600 border px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-100 transition-all"><LogOut size={16} />Sair</button>
+              <button onClick={handleLogout} className="bg-red-50 text-red-600 px-4 py-1.5 rounded-lg text-sm font-bold ml-4">Sair</button>
             ) : (
-              <button onClick={() => setShowLoginModal(true)} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-1.5 rounded-lg text-sm font-semibold shadow-sm hover:bg-slate-900 transition-all"><Unlock size={16} />Admin</button>
+              <button onClick={() => setShowLoginModal(true)} className="bg-slate-800 text-white px-4 py-1.5 rounded-lg text-sm font-bold ml-4">Admin</button>
             )}
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 pt-8 space-y-6">
-        {connError && (
-          <div className="bg-red-50 border border-red-200 p-4 rounded-xl text-red-700 flex items-center gap-3">
-            <AlertCircle className="shrink-0" /><p className="text-sm font-medium">{connError}</p>
+        {isLoadingData ? (
+          <div className="flex flex-col items-center justify-center py-20 space-y-4">
+            <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-slate-500 font-bold animate-pulse">CARREGANDO DADOS DA GOL...</p>
           </div>
-        )}
-
-        <section className="bg-gradient-to-br from-orange-500 to-slate-300 rounded-2xl p-6 shadow-xl text-slate-800 space-y-6 border border-white/20">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-black/5 pb-4">
-            <div>
-              <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900"><Sparkles className="text-orange-600" /> Analista de IA GOL</h2>
-              <p className="text-slate-600 text-sm font-medium">Análise estratégica e insights baseados em dados reais.</p>
-            </div>
-            <button 
-              onClick={generateAiSummary} 
-              disabled={isGeneratingAi || filteredData.length === 0}
-              className="flex items-center gap-2 bg-white/40 hover:bg-white/60 backdrop-blur-md px-6 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 text-slate-900 border border-white/40"
-            >
-              {isGeneratingAi ? <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" /> : <Sparkles size={18} />}
-              {isGeneratingAi ? 'Analisando...' : 'Gerar Resumo Operacional'}
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <form onSubmit={askAiQuestion} className="relative">
-              <input 
-                type="text" 
-                value={userQuestion}
-                onChange={(e) => setUserQuestion(e.target.value)}
-                placeholder="Ex: Quais P/N causaram mais paradas em Guarulhos?"
-                className="w-full bg-white/40 border border-white/60 rounded-xl px-4 py-3.5 pr-12 outline-none focus:ring-2 focus:ring-orange-600/30 placeholder:text-slate-500 text-slate-900 font-medium"
-              />
-              <button 
-                type="submit" 
-                disabled={isAnswering || !userQuestion.trim()}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-black/5 rounded-lg transition-colors disabled:opacity-30 text-slate-900"
-              >
-                {isAnswering ? <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" /> : <Send size={20} />}
-              </button>
-            </form>
-
-            {(aiSummary || aiAnswer) && (
-              <div className="bg-white/50 rounded-xl p-6 border border-white/60 animate-in fade-in slide-in-from-top-2 max-h-[400px] overflow-y-auto scrollbar-hide shadow-inner">
-                {aiSummary && (
-                  <div className="mb-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-orange-700 mb-2">Resumo Geral Operacional</p>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap font-medium">{aiSummary}</p>
-                  </div>
-                )}
-                {aiAnswer && (
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-orange-700 mb-2">Resposta Especialista</p>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap font-medium">{aiAnswer}</p>
+        ) : (
+          <>
+            <section className="bg-gradient-to-br from-orange-500 to-slate-800 rounded-2xl p-6 shadow-xl text-white">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-xl font-bold flex items-center gap-2"><Sparkles /> Analista de IA GOL</h2>
+                  <p className="text-orange-100 text-sm">Insights automáticos baseados nos registros.</p>
+                </div>
+                <button onClick={generateAiSummary} disabled={isGeneratingAi || filteredData.length === 0} className="bg-white text-slate-900 px-6 py-2 rounded-xl font-bold text-sm shadow-lg hover:bg-orange-50 disabled:opacity-50 transition-all">
+                  {isGeneratingAi ? 'Analisando...' : 'Gerar Resumo'}
+                </button>
+              </div>
+              <div className="space-y-4">
+                <form onSubmit={askAiQuestion} className="relative">
+                  <input type="text" value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)} placeholder="Faça uma pergunta para a IA..." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-12 text-white placeholder:text-white/50 outline-none focus:bg-white/20" />
+                  <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/70 hover:text-white"><Send size={20} /></button>
+                </form>
+                {(aiSummary || aiAnswer) && (
+                  <div className="bg-white/10 rounded-xl p-4 border border-white/20 text-sm leading-relaxed whitespace-pre-wrap">
+                    {aiSummary || aiAnswer}
                   </div>
                 )}
               </div>
+            </section>
+
+            {isAuthenticated && (
+              <section className="bg-white rounded-2xl border-2 border-orange-600 border-dashed p-6 flex justify-between items-center">
+                <div>
+                  <h2 className="font-bold text-slate-900">Importação de Dados</h2>
+                  <p className="text-sm text-slate-500">Envie o arquivo Excel para atualizar o banco.</p>
+                </div>
+                <label className="bg-orange-600 text-white px-8 py-3 rounded-xl font-bold cursor-pointer hover:bg-orange-700 transition-all">
+                  <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
+                  {isProcessing ? 'Processando...' : 'Selecionar Arquivo'}
+                </label>
+              </section>
             )}
-          </div>
-        </section>
 
-        {isAuthenticated && (
-          <section className="bg-white rounded-2xl border-2 border-orange-600 border-dashed p-6 shadow-md">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Cloud size={20} className="text-orange-600" />Painel de Importação</h2>
-                <p className="text-sm text-slate-500">Alimente a base de dados GOL AOS via Excel.</p>
-              </div>
-              <label className="cursor-pointer group">
-                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} disabled={isProcessing} />
-                <div className="flex items-center justify-center gap-2 px-8 py-3.5 bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 hover:bg-orange-700 transition-all">
-                  {isProcessing ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <FileSpreadsheet size={20} />}
-                  {isProcessing ? 'Enviando...' : 'Importar Novos Dados'}
-                </div>
-              </label>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <StatCard label="Total de Registros" value={stats.total} color="orange" />
+              <StatCard label="Bases Atendidas" value={stats.bases} color="blue" />
+              <StatCard label="Mtl Utilizado" value={stats.mtl} color="green" />
+              <StatCard label="Partnumbers" value={stats.partnumbers} color="purple" />
             </div>
-          </section>
-        )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total de Registros" value={stats.total} color="orange" />
-          <StatCard label="Bases Atendidas" value={stats.bases} color="blue" />
-          <StatCard label="Mtl Utilizado" value={stats.mtl} color="green" />
-          <StatCard label="P/N's Diferentes" value={stats.partnumbers} color="purple" />
-        </div>
-
-        <section className="bg-white rounded-2xl border p-6 shadow-sm space-y-6">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <h3 className="text-xl font-bold text-slate-900">Visualização de Performance</h3>
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Controles de Redimensionamento Manual */}
-              <div className="flex items-center gap-4 bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 shadow-inner">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1"><Settings2 size={10}/> Espessura</label>
-                  <input 
-                    type="range" min="5" max="50" step="1" 
-                    value={manualBarThickness} 
-                    onChange={(e) => setManualBarThickness(Number(e.target.value))}
-                    className="w-24 accent-orange-600 cursor-pointer"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1"><Settings2 size={10}/> Aproximação</label>
-                  <input 
-                    type="range" min="2" max="60" step="0.1" 
-                    value={manualRowHeight} 
-                    onChange={(e) => setManualRowHeight(Number(e.target.value))}
-                    className="w-24 accent-orange-600 cursor-pointer"
-                  />
+            <section className="bg-white rounded-2xl border p-6 shadow-sm">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-slate-900">Gráfico de Performance</h3>
+                <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
+                  {(['base', 'acft', 'tipo', 'tempo'] as ChartView[]).map(v => (
+                    <button key={v} onClick={() => setChartView(v)} className={`px-4 py-1.5 rounded-md text-xs font-bold ${chartView === v ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500'}`}>
+                      {v.toUpperCase()}
+                    </button>
+                  ))}
                 </div>
               </div>
-
-              <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-                <select 
-                  value={selectedAcft} 
-                  onChange={(e) => setSelectedAcft(e.target.value)}
-                  className="bg-white px-3 py-1.5 rounded-lg text-sm font-bold text-slate-700 border border-slate-200 outline-none focus:ring-2 focus:ring-orange-200"
-                >
-                  <option value="all">Frotas GOL (Todas)</option>
-                  {acftList.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-                <div className="h-6 w-px bg-slate-200 hidden sm:block mx-1"></div>
-                {(['base', 'acft', 'partnumber', 'tipo', 'tempo'] as ChartView[]).map(v => (
-                  <button 
-                    key={v} 
-                    onClick={() => setChartView(v)} 
-                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${chartView === v ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
-                  >
-                    {v === 'base' ? 'Bases' : v === 'acft' ? 'Aeronaves' : v === 'partnumber' ? 'Partnumbers' : v === 'tipo' ? 'MTL' : 'Tempo'}
-                  </button>
-                ))}
+              <div className="h-[400px] overflow-auto">
+                <div style={{ height: chartHeight + 'px' }}>
+                  <MainChart data={filteredData} view={chartView} onBarClick={(l, r) => setSelectedBarData({ label: l, rows: r })} />
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="w-full overflow-y-auto overflow-x-hidden scrollbar-hide border rounded-xl" style={{ height: '420px' }}>
-            <div style={{ height: chartHeight + 'px', width: '100%' }}>
-              <MainChart 
-                data={filteredData} 
-                view={chartView} 
-                onBarClick={(label, rows) => setSelectedBarData({ label, rows })} 
-                barThickness={manualBarThickness}
-              />
-            </div>
-          </div>
-        </section>
+            </section>
 
-        {(selectedBarData || filteredData.length > 0) && (
-          <section className="bg-white rounded-2xl border overflow-hidden shadow-sm">
-            <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
-              <h3 className="font-bold text-slate-800">{selectedBarData ? `Detalhamento: ${selectedBarData.label}` : 'Analítico Completo'}</h3>
-              <button onClick={() => setSelectedBarData(null)} className="text-orange-600 text-sm font-bold hover:underline">Limpar Seleção</button>
-            </div>
-            <AnalyticTable 
-              data={selectedBarData ? selectedBarData.rows : filteredData} 
-              fullData={rawData} 
-              isAdmin={isAuthenticated} 
-              onDelete={deleteRow}
-            />
-          </section>
+            <section className="bg-white rounded-2xl border shadow-sm">
+              <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+                <h3 className="font-bold text-slate-800">{selectedBarData ? `Filtro: ${selectedBarData.label}` : 'Dados Analíticos'}</h3>
+                {selectedBarData && <button onClick={() => setSelectedBarData(null)} className="text-orange-600 text-xs font-bold uppercase tracking-tighter">Limpar Filtro</button>}
+              </div>
+              <AnalyticTable data={selectedBarData ? selectedBarData.rows : filteredData} fullData={rawData} isAdmin={isAuthenticated} onDelete={deleteRow} />
+            </section>
+          </>
         )}
       </main>
     </div>
