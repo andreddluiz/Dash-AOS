@@ -28,9 +28,10 @@ interface MainChartProps {
   data: AOSRow[];
   view: ChartView;
   onBarClick: (label: string, rows: AOSRow[]) => void;
+  barThickness?: number;
 }
 
-const MainChart: React.FC<MainChartProps> = ({ data, view, onBarClick }) => {
+const MainChart: React.FC<MainChartProps> = ({ data, view, onBarClick, barThickness = 20 }) => {
   // Aeronaves e Partnumbers usam layout horizontal devido à quantidade de itens
   const isHorizontal = view === 'acft' || view === 'partnumber';
 
@@ -73,7 +74,7 @@ const MainChart: React.FC<MainChartProps> = ({ data, view, onBarClick }) => {
             borderRadius: isHorizontal 
               ? { topRight: 8, bottomRight: 8 } 
               : { topLeft: 8, topRight: 8 },
-            barThickness: 20,
+            barThickness: barThickness,
             barPercentage: 1.0,
             categoryPercentage: 1.0,
             minBarLength: 2,
@@ -83,14 +84,13 @@ const MainChart: React.FC<MainChartProps> = ({ data, view, onBarClick }) => {
       },
       maxValue: max
     };
-  }, [data, view, isHorizontal]);
+  }, [data, view, isHorizontal, barThickness]);
 
   const options = {
     indexAxis: isHorizontal ? 'y' as const : 'x' as const,
     responsive: true,
     maintainAspectRatio: false,
     layout: {
-      // Aumentado o padding para garantir que os datalabels não sejam cortados
       padding: isHorizontal 
         ? { right: 80, left: 20, top: 10, bottom: 10 } 
         : { top: 50, bottom: 20, left: 15, right: 15 }
@@ -120,14 +120,12 @@ const MainChart: React.FC<MainChartProps> = ({ data, view, onBarClick }) => {
         grid: { display: isHorizontal, color: '#f1f5f9' }, 
         ticks: { 
           font: { weight: 'bold' as const, size: 10 },
-          // Evita rotação excessiva em telas pequenas para manter legibilidade
           maxRotation: isHorizontal ? 0 : 45,
           minRotation: isHorizontal ? 0 : 0,
           autoSkip: true
         },
         beginAtZero: true,
         border: { display: false },
-        // Garante espaço extra para os datalabels no eixo de valores
         suggestedMax: isHorizontal ? maxValue * 1.15 : undefined
       },
       y: { 
@@ -138,7 +136,6 @@ const MainChart: React.FC<MainChartProps> = ({ data, view, onBarClick }) => {
         },
         beginAtZero: true, 
         border: { display: false },
-        // Garante espaço extra para os datalabels no eixo de valores
         suggestedMax: !isHorizontal ? maxValue * 1.15 : undefined
       },
     },

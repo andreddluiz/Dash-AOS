@@ -2,7 +2,8 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   BarChart3, FileSpreadsheet, Download, Table, LayoutDashboard, 
-  FileCode, Lock, Unlock, LogOut, X, Cloud, AlertCircle, Sparkles, Trash2, Search, Filter, Send
+  FileCode, Lock, Unlock, LogOut, X, Cloud, AlertCircle, Sparkles, Trash2, Search, Filter, Send,
+  Settings2
 } from 'lucide-react';
 import { AOSRow, ChartView } from './types';
 import StatCard from './components/StatCard';
@@ -26,6 +27,10 @@ const App: React.FC = () => {
   const [selectedBarData, setSelectedBarData] = useState<{ label: string; rows: AOSRow[] } | null>(null);
   const [connError, setConnError] = useState<string | null>(null);
   
+  // Controles manuais de eixo/barras
+  const [manualBarThickness, setManualBarThickness] = useState(20);
+  const [manualRowHeight, setManualRowHeight] = useState(20.3);
+
   // AI States
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -197,7 +202,6 @@ const App: React.FC = () => {
       .sort((a, b) => {
         const [mA, yA] = a.key.split('/').map(Number);
         const [mB, yB] = b.key.split('/').map(Number);
-        // Ordenação cronológica crescente: primeiro por Ano, depois por Mês
         return (yA * 100 + mA) - (yB * 100 + mB);
       });
   }, [rawData]);
@@ -213,11 +217,10 @@ const App: React.FC = () => {
     if (chartView === 'acft' || chartView === 'partnumber') {
       const field = chartView === 'acft' ? 'ac' : 'partnumber';
       const uniqueCount = new Set(filteredData.map(r => r[field as keyof AOSRow])).size;
-      // Reduzido de 21 para 20.3 para deixar as barras extremamente próximas (quase se tocando)
-      return Math.max(400, uniqueCount * 20.3 + 80);
+      return Math.max(400, uniqueCount * manualRowHeight + 80);
     }
     return 400;
-  }, [chartView, filteredData]);
+  }, [chartView, filteredData, manualRowHeight]);
 
   return (
     <div className="min-h-screen pb-12 transition-colors duration-500">
@@ -370,30 +373,59 @@ const App: React.FC = () => {
         <section className="bg-white rounded-2xl border p-6 shadow-sm space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <h3 className="text-xl font-bold text-slate-900">Visualização de Performance</h3>
-            <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-              <select 
-                value={selectedAcft} 
-                onChange={(e) => setSelectedAcft(e.target.value)}
-                className="bg-white px-3 py-1.5 rounded-lg text-sm font-bold text-slate-700 border border-slate-200 outline-none focus:ring-2 focus:ring-orange-200"
-              >
-                <option value="all">Frotas GOL (Todas)</option>
-                {acftList.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-              <div className="h-6 w-px bg-slate-200 hidden sm:block mx-1"></div>
-              {(['base', 'acft', 'partnumber', 'tipo', 'tempo'] as ChartView[]).map(v => (
-                <button 
-                  key={v} 
-                  onClick={() => setChartView(v)} 
-                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${chartView === v ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Controles de Redimensionamento Manual */}
+              <div className="flex items-center gap-4 bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 shadow-inner">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1"><Settings2 size={10}/> Espessura</label>
+                  <input 
+                    type="range" min="5" max="50" step="1" 
+                    value={manualBarThickness} 
+                    onChange={(e) => setManualBarThickness(Number(e.target.value))}
+                    className="w-24 accent-orange-600 cursor-pointer"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1"><Settings2 size={10}/> Aproximação</label>
+                  <input 
+                    type="range" min="2" max="60" step="0.1" 
+                    value={manualRowHeight} 
+                    onChange={(e) => setManualRowHeight(Number(e.target.value))}
+                    className="w-24 accent-orange-600 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                <select 
+                  value={selectedAcft} 
+                  onChange={(e) => setSelectedAcft(e.target.value)}
+                  className="bg-white px-3 py-1.5 rounded-lg text-sm font-bold text-slate-700 border border-slate-200 outline-none focus:ring-2 focus:ring-orange-200"
                 >
-                  {v === 'base' ? 'Bases' : v === 'acft' ? 'Aeronaves' : v === 'partnumber' ? 'Partnumbers' : v === 'tipo' ? 'MTL' : 'Tempo'}
-                </button>
-              ))}
+                  <option value="all">Frotas GOL (Todas)</option>
+                  {acftList.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                <div className="h-6 w-px bg-slate-200 hidden sm:block mx-1"></div>
+                {(['base', 'acft', 'partnumber', 'tipo', 'tempo'] as ChartView[]).map(v => (
+                  <button 
+                    key={v} 
+                    onClick={() => setChartView(v)} 
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${chartView === v ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
+                  >
+                    {v === 'base' ? 'Bases' : v === 'acft' ? 'Aeronaves' : v === 'partnumber' ? 'Partnumbers' : v === 'tipo' ? 'MTL' : 'Tempo'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <div className="w-full overflow-y-auto overflow-x-hidden scrollbar-hide border rounded-xl" style={{ height: '420px' }}>
             <div style={{ height: chartHeight + 'px', width: '100%' }}>
-              <MainChart data={filteredData} view={chartView} onBarClick={(label, rows) => setSelectedBarData({ label, rows })} />
+              <MainChart 
+                data={filteredData} 
+                view={chartView} 
+                onBarClick={(label, rows) => setSelectedBarData({ label, rows })} 
+                barThickness={manualBarThickness}
+              />
             </div>
           </div>
         </section>
