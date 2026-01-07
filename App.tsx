@@ -145,18 +145,36 @@ const App: React.FC = () => {
     }
     setIsGeneratingAi(true);
     setAiSummary(null);
+    setAiAnswer(null);
+
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const dataString = filteredData.slice(0, 30).map(r => `Base:${r.base}|AC:${r.ac}|Tempo:${r.tempo_aos}`).join('\n');
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Analise estes dados de logística AOS GOL e resuma em português: ${dataString}`,
+      
+      // Criar um contexto agregado para a IA em vez de apenas linhas brutas
+      const baseStats: Record<string, number> = {};
+      const typeStats: Record<string, number> = {};
+      filteredData.forEach(r => {
+        baseStats[r.base] = (baseStats[r.base] || 0) + 1;
+        typeStats[r.analise_mtl] = (typeStats[r.analise_mtl] || 0) + 1;
       });
 
-      setAiSummary(response.text ?? null);
+      const context = `
+        Resumo Operacional AOS GOL:
+        Total de Eventos: ${filteredData.length}
+        Bases mais afetadas: ${Object.entries(baseStats).sort((a,b) => b[1]-a[1]).slice(0,5).map(([k,v]) => `${k}(${v})`).join(', ')}
+        Tipos de Atendimento: ${Object.entries(typeStats).map(([k,v]) => `${k}: ${v}`).join(' | ')}
+        Período selecionado: ${currentMonth === 'all' ? 'Geral' : currentMonth}
+      `;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: `Você é um analista sênior de logística de aviação da GOL. Analise o seguinte contexto e forneça insights estratégicos em português, focando em gargalos e performance: ${context}`,
+      });
+
+      setAiSummary(response.text ?? "Não foi possível gerar o resumo.");
     } catch (err) {
-      setAiSummary("Erro na comunicação com a IA.");
+      setAiSummary("Erro na comunicação com a IA. Verifique os logs do console.");
+      console.error(err);
     } finally {
       setIsGeneratingAi(false);
     }
@@ -165,17 +183,27 @@ const App: React.FC = () => {
   const askAiQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userQuestion.trim() || !process.env.API_KEY) return;
+    
     setIsAnswering(true);
     setAiAnswer(null);
+    setAiSummary(null);
+
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const currentQ = userQuestion;
+      setUserQuestion('');
+
+      const dataSample = filteredData.slice(0, 50).map(r => `Base:${r.base},AC:${r.ac},PN:${r.partnumber},T_AOS:${r.tempo_aos}`).join(';');
+      
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: userQuestion,
+        model: 'gemini-3-pro-preview',
+        contents: `Contexto de Amostra (Top 50 registros): ${dataSample}\n\nPergunta do Usuário: ${currentQ}`,
       });
-      setAiAnswer(response.text ?? null);
+
+      setAiAnswer(response.text ?? "A IA não retornou uma resposta válida.");
     } catch (err) {
-      setAiAnswer("Erro ao processar pergunta.");
+      setAiAnswer("Erro ao processar sua pergunta. Tente novamente em instantes.");
+      console.error(err);
     } finally {
       setIsAnswering(false);
     }
@@ -194,11 +222,6 @@ const App: React.FC = () => {
     }
     return data;
   }, [rawData, currentMonth, selectedAcft]);
-
-  const acftList = useMemo(() => {
-    const list = Array.from(new Set(rawData.map(r => r.ac).filter(Boolean))).sort();
-    return list;
-  }, [rawData]);
 
   const monthTabs = useMemo(() => {
     const months = new Map<string, string>();
@@ -295,10 +318,12 @@ const App: React.FC = () => {
               <div className="space-y-4">
                 <form onSubmit={askAiQuestion} className="relative">
                   <input type="text" value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)} placeholder="Faça uma pergunta para a IA..." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-12 text-white placeholder:text-white/50 outline-none focus:bg-white/20" />
-                  <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/70 hover:text-white"><Send size={20} /></button>
+                  <button type="submit" disabled={isAnswering} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/70 hover:text-white disabled:opacity-30">
+                    {isAnswering ? <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <Send size={20} />}
+                  </button>
                 </form>
                 {(aiSummary || aiAnswer) && (
-                  <div className="bg-white/10 rounded-xl p-4 border border-white/20 text-sm leading-relaxed whitespace-pre-wrap">
+                  <div className="bg-white/10 rounded-xl p-4 border border-white/20 text-sm leading-relaxed whitespace-pre-wrap animate-in fade-in duration-300">
                     {aiSummary || aiAnswer}
                   </div>
                 )}

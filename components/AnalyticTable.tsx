@@ -18,7 +18,7 @@ const AnalyticTable: React.FC<AnalyticTableProps> = ({ data, fullData, isAdmin, 
   const [searchTerm, setSearchTerm] = useState('');
   const [sort, setSort] = useState<SortState>({ col: 'start_date', dir: 1 });
   const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
   const [filterColumn, setFilterColumn] = useState<keyof AOSRow | ''>('');
   const [filterValue, setFilterValue] = useState('');
   const [columnOrder, setColumnOrder] = useState<(keyof AOSRow)[]>(ANALYTIC_COLUMNS);
@@ -48,8 +48,9 @@ const AnalyticTable: React.FC<AnalyticTableProps> = ({ data, fullData, isAdmin, 
     return result;
   }, [data, searchTerm, sort, filterColumn, filterValue, columnOrder]);
 
-  const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-  const pagedData = filteredData.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const effectiveRowsPerPage = rowsPerPage === 'all' ? filteredData.length : rowsPerPage;
+  const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(filteredData.length / rowsPerPage);
+  const pagedData = rowsPerPage === 'all' ? filteredData : filteredData.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   const handleResizeStart = (e: React.MouseEvent, col: keyof AOSRow) => {
     e.stopPropagation(); e.preventDefault();
@@ -125,13 +126,28 @@ const AnalyticTable: React.FC<AnalyticTableProps> = ({ data, fullData, isAdmin, 
 
       <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
         <div className="flex items-center gap-3 text-sm text-slate-500 font-medium">
-          Exibir <select className="border rounded-lg px-2 py-1 outline-none" value={rowsPerPage} onChange={e => setRowsPerPage(Number(e.target.value))}>{[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}</select> linhas
+          Exibir 
+          <select 
+            className="border rounded-lg px-2 py-1 outline-none bg-white font-bold text-slate-700" 
+            value={rowsPerPage} 
+            onChange={e => {
+              const val = e.target.value === 'all' ? 'all' : Number(e.target.value);
+              setRowsPerPage(val);
+              setPage(1);
+            }}
+          >
+            {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+            <option value="all">Todos</option>
+          </select> 
+          linhas
         </div>
-        <div className="flex items-center gap-2">
-          <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-2 border rounded-lg bg-white disabled:opacity-30"><ChevronLeft size={18} /></button>
-          <span className="text-sm font-bold px-4">{page} / {totalPages || 1}</span>
-          <button disabled={page === totalPages || totalPages === 0} onClick={() => setPage(p => p + 1)} className="p-2 border rounded-lg bg-white disabled:opacity-30"><ChevronRight size={18} /></button>
-        </div>
+        {rowsPerPage !== 'all' && (
+          <div className="flex items-center gap-2">
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-2 border rounded-lg bg-white disabled:opacity-30 hover:bg-slate-50 transition-colors"><ChevronLeft size={18} /></button>
+            <span className="text-sm font-bold px-4">{page} / {totalPages || 1}</span>
+            <button disabled={page === totalPages || totalPages === 0} onClick={() => setPage(p => p + 1)} className="p-2 border rounded-lg bg-white disabled:opacity-30 hover:bg-slate-50 transition-colors"><ChevronRight size={18} /></button>
+          </div>
+        )}
       </div>
     </div>
   );
