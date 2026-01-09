@@ -53,7 +53,32 @@ const MainChart: React.FC<MainChartProps> = ({
       else if (view === 'acft') key = row.ac || 'N/A';
       else if (view === 'partnumber') key = row.partnumber || 'N/A';
       else if (view === 'tipo') key = row.analise_mtl || 'N/A';
-      else if (view === 'tempo') key = row.range || 'N/A';
+      else if (view === 'tempo') {
+        const r = (row.range || '').toLowerCase().trim();
+        
+        // Mapeamento preciso baseado na coluna Range
+        if (r.includes('48') && (r.includes('acima') || r.includes('>') || r.includes('+'))) {
+          key = "acima de 48h";
+        } else if (r.includes('24') && r.includes('48')) {
+          key = "24 e 48h";
+        } else if (r.includes('12') && r.includes('24')) {
+          key = "12 e 24h";
+        } else if (r.includes('6') && r.includes('12')) {
+          key = "6 e 12h";
+        } else if (r.includes('1') && r.includes('6')) {
+          key = "1 e 6h";
+        } else if (r.includes('0') && r.includes('1')) {
+          key = "0 e 1h";
+        } else {
+          // Tentativas de fallback para strings menos padronizadas
+          if (r.includes('48')) key = "acima de 48h";
+          else if (r.includes('24')) key = "12 e 24h";
+          else if (r.includes('12')) key = "6 e 12h";
+          else if (r.includes('6')) key = "1 e 6h";
+          else if (r.includes('1')) key = "0 e 1h";
+          else key = "SEM INFORMAÇÃO";
+        }
+      }
       
       if (!aggregates[key]) aggregates[key] = [];
       aggregates[key].push(row);
@@ -61,16 +86,17 @@ const MainChart: React.FC<MainChartProps> = ({
 
     let labels: string[] = [];
     if (view === 'tempo') {
-      labels = TEMPO_ORDER.filter(l => aggregates[l]);
+      // Força a exibição das 6 barras solicitadas na ordem correta
+      labels = TEMPO_ORDER;
     } else {
-      labels = Object.keys(aggregates).sort((a, b) => aggregates[b].length - aggregates[a].length);
+      labels = Object.keys(aggregates).sort((a, b) => (aggregates[b]?.length || 0) - (aggregates[a]?.length || 0));
       // Limita a visualização inicial de Partnumbers aos top 50 para performance
       if (view === 'partnumber' && labels.length > 50) {
         labels = labels.slice(0, 50);
       }
     }
 
-    const values = labels.map(l => aggregates[l].length);
+    const values = labels.map(l => aggregates[l]?.length || 0);
     const max = values.length > 0 ? Math.max(...values) : 0;
 
     return {
@@ -152,7 +178,7 @@ const MainChart: React.FC<MainChartProps> = ({
       if (elements.length > 0) {
         const index = elements[0].index;
         const label = chartData.labels[index];
-        onBarClick(label, chartData.aggregates[label]);
+        onBarClick(label, chartData.aggregates[label] || []);
       }
     }
   };

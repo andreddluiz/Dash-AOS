@@ -40,17 +40,12 @@ export const COLUMN_DISPLAY_NAMES: Record<keyof AOSRow, string> = {
 };
 
 export const TEMPO_ORDER = [
-  "Entre 0h e 01h",
-  "Entre 1h e 06h",
-  "Entre 6h e 12h",
-  "Entre 12h e 13h",
-  "Entre 13h e 14h",
-  "Entre 14h e 15h",
-  "Entre 15h e 16h",
-  "Entre 16h e 24h",
-  "Entre 24h e 48h",
-  "Acima de 48h",
-  "SEM INFORMAÇÃO"
+  "0 e 1h",
+  "1 e 6h",
+  "6 e 12h",
+  "12 e 24h",
+  "24 e 48h",
+  "acima de 48h"
 ];
 
 export const CHART_COLORS = [
